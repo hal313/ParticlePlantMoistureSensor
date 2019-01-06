@@ -1,0 +1,47 @@
+<!DOCTYPE HTML>
+<html>
+<body>
+    <span id="status"></span><br>
+    <span id="tstamp"></span>
+
+    <br><br>
+
+    <script type="text/javascript">
+        (() => {
+            let urlSearchParams = new URLSearchParams(window.location.search);
+
+            let deviceID = urlSearchParams.get('deviceID');
+            let accessToken  = urlSearchParams.get('accessToken');
+            if (!deviceID || !accessToken) {
+                // TODO: Add error message to UI
+                console.log('supply "deviceID" and "accessToken"');
+            } else {
+                let url = `https://api.spark.io/v1/devices/${deviceID}/events/?access_token=${accessToken}`;
+                let eventSource = new EventSource(url);
+
+                // References to the DOM elements
+                let statusSpan = document.getElementById('status');
+                let tsSpan = document.getElementById('tstamp');
+
+                // TODO: Use CSS instead
+                tsSpan.style.fontSize = "9px";
+
+                eventSource.addEventListener('error', (error) => {
+                    // TODO: Add to UI
+                    console.log('Service error', error);
+                }, false);
+
+                // Event listener for state
+                eventSource.addEventListener('state', (stateEvent) => {
+                    let parsedData = JSON.parse(stateEvent.data);
+
+                    // Set the data
+                    statusSpan.innerHTML = parsedData.data;
+                    tsSpan.innerHTML = "At timestamp " + parsedData.published_at;
+                }, false);
+            }
+
+        })();
+    </script>
+</body>
+</html>
