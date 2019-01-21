@@ -125,9 +125,9 @@ void loop() {
     
     // Set the LED status
     if (STATE_MOISTURE_DRY == state) {
-        digitalWrite(PIN_LED, LOW);
-    } else {
         digitalWrite(PIN_LED, HIGH);
+    } else {
+        digitalWrite(PIN_LED, LOW);
     }
 
     
