@@ -26,17 +26,20 @@ const char *VALUE_MOISTURE_WET = "WET";
 ////////////////////////////////////////////////////////////////////////////////
 //
 // The version indicator
-const int VERSION = 313;
+const int VERSION = 315;
 // The default moisture threshold
 const int DEFAULT_MOISTURE_THRESHOLD = 1500;
 // The address of the settings in EEPROM
 const int ADDRESS_SETTINGS = 10;
+// The allowance for the sensor readings
+const int SENSOR_ALLOWANCE = 6; // 6%
 
 
 ////////////////////////////////////////////////////////////////////////////////
 // Moisture state values
 ////////////////////////////////////////////////////////////////////////////////
 //
+// TODO: Use an enum for the moisture state
 const int STATE_MOISTURE_DRY = 0;
 const int STATE_MOISTURE_WET = 1;
 
@@ -118,6 +121,15 @@ void loop() {
     
     // Process the moisture value
     handleMoistureReading();
+    
+    
+    // Set the LED status
+    if (STATE_MOISTURE_DRY == state) {
+        digitalWrite(PIN_LED, LOW);
+    } else {
+        digitalWrite(PIN_LED, HIGH);
+    }
+
     
     // If the calibrate button is pressed, then recalibrate the moisture threshold
     if(LOW == digitalRead(PIN_BUTTON)) {
@@ -203,25 +215,31 @@ void handleSetMoistureThreshold() {
  * 
  */
 void handleMoistureReading() {
-    // Get the current state
-    int currentState = getState();
 
-    if (STATE_MOISTURE_WET == currentState) {
-        if (state != STATE_MOISTURE_WET) {
-            state = STATE_MOISTURE_WET;
-            publishCurrentState();
-        }
-        // Turn off the LED
-        digitalWrite(PIN_LED, LOW);
-    } else if (STATE_MOISTURE_DRY == currentState) {
-        if (state != STATE_MOISTURE_DRY) {
-            state = STATE_MOISTURE_DRY;
-            publishCurrentState();
-        }
-        // Turn on the LED
-        digitalWrite(PIN_LED, HIGH);
+    if (-1 == state) {
+        // There is no state; set the state to the current state
+        state = moistureSensorValue < settings.moistureThreshold ? STATE_MOISTURE_DRY : STATE_MOISTURE_WET;;
+        
+        // Publish the current state
+        publishCurrentState();
+    }
+
+    // If the previous state is DRY AND the moisture sensor value is above the threshold + allowance
+    else if (state != STATE_MOISTURE_WET && moistureSensorValue > settings.moistureThreshold + SENSOR_ALLOWANCE) {
+        // Change state to WET
+        state = STATE_MOISTURE_WET;
+        // Publish the change of state
+        publishCurrentState();
     }
     
+    // If the previous state is WET AND the moisture sensor value is below the threshold - allowance
+    else if (state != STATE_MOISTURE_DRY && moistureSensorValue < settings.moistureThreshold - SENSOR_ALLOWANCE) {
+        // Change state to dry
+        state = STATE_MOISTURE_DRY;
+        // Publish the change of state
+        publishCurrentState();
+    }
+
 }
 
 
@@ -248,22 +266,6 @@ void publishCurrentState() {
     } else if (STATE_MOISTURE_WET == state) {
         Particle.publish(NAME_MOISTURE_STATE, VALUE_MOISTURE_WET);
     }
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// State functions
-//
-/**
- * Gets the current moisture state.
- * 
- * @return STATE_MOISTURE_DRY or STATE_MOISTURE_WET, depending on the current moisture state compared to the moisture threshold setting.
- */
-int getState() {
-    if (moistureSensorValue < settings.moistureThreshold) {
-        return STATE_MOISTURE_DRY;
-    }
-    return STATE_MOISTURE_WET;
 }
 
 
@@ -312,7 +314,6 @@ void unpersistSettings() {
         
         // Set the new version
         settings.version = VERSION;
-        
         // Persist the new version
         persistSettings();
     }
@@ -334,8 +335,8 @@ void readMoistureValue() {
     delay(10);
     
     // Read the value and store in the sensorValue global
-    moistureSensorValue = analogRead(A0);
-    
+    moistureSensorValue = map(analogRead(A0), 0, 4095, 0, 100);
+
     // Turn off the sensor
     digitalWrite(PIN_MOISTURE_SENSOR_POWER, LOW);
 }
