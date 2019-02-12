@@ -3,7 +3,8 @@
   "version": "0.9.1",
   "description": "Plant moisture sensor - website and Particle code",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "cd status-website && cp -a src/* public && firebase deploy"
   },
   "repository": {
     "type": "git",

@@ -1,0 +1,4 @@
+# Firebase cache
+.firebase/
+# Firebase deploy stating dir
+public/

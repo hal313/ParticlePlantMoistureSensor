@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard</title>
+
+    <!-- update the version number as needed -->
+    <script defer src="/__/firebase/5.8.2/firebase-app.js"></script>
+    <script defer src="/__/firebase/5.8.2/firebase-database.js"></script>
+    <script defer src="/__/firebase/init.js"></script>
+  </head>
+  <body>
+
+    <div id="devices"></div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        try {
+          let database = firebase.database();
+          
+          $(() => {
+            let $deviceRoot = $('#devices');
+
+            database
+              .ref('devices')
+              .on('value',
+                snapshot => {
+                  $.each(snapshot.val(), (deviceId, value) => {
+                    // Empty the device
+                    $deviceRoot.empty();
+
+                    // TODO: Make this look nicer
+                    // TODO: Setup users; each user has a list of device (by id) which has a friendly name  
+                    $deviceRoot.append(`
+                      <div class="device">
+                        <div class="id">Device ${deviceId}</div>
+                        <div class="metrics-container">
+                          <div class="metric-container">
+                            <div class="metric-name">State</div>
+                            <div class="metric-value">${value.state}</div>
+                          </div>
+                          <div class="metric-container">
+                            <div class="metric-name">Moisture %</div>
+                            <div class="metric-value">${value.moisture}</div>
+                          </div>
+                          <div class="metric-container">
+                            <div class="metric-name">Moisture Threshold</div>
+                            <div class="metric-value">${value.threshold}</div>
+                          </div>
+                          <div class="metric-container">
+                            <div class="metric-name">Time </div>
+                            <div class="metric-value">${new Date(value.timestamp)}</div>
+                          </div>                          
+                        </div>
+                      </div>
+                    `);
+                  })
+                },
+                error => {
+                  // TODO: Display the error to the user
+                  console.error(error);
+                }
+              );
+          });         
+        } catch (e) {
+          // TODO: Display the error to the user
+          console.error(e);
+          console.log('Error loading the Firebase SDK, check the console.');
+        }
+      });
+    </script>
+  </body>
+</html>
