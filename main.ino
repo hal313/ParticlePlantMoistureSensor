@@ -40,7 +40,6 @@ const int SENSOR_ALLOWANCE = 6; // 6%
 // Moisture state values
 ////////////////////////////////////////////////////////////////////////////////
 //
-// TODO: Use an enum for the moisture state
 const int STATE_MOISTURE_DRY = 0;
 const int STATE_MOISTURE_WET = 1;
 
