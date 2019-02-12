@@ -19,6 +19,7 @@ const char *NAME_MOISTURE_THRESHOLD = "moisture_threshold";
 const char *NAME_MOISTURE_STATE = "state";
 const char *VALUE_MOISTURE_DRY = "DRY";
 const char *VALUE_MOISTURE_WET = "WET";
+const char *WEBHOOK_FIREBASE_POST = "firebase-post-data";
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,22 +126,22 @@ void loop() {
     
     // Set the LED status
     if (STATE_MOISTURE_DRY == state) {
-        digitalWrite(PIN_LED, LOW);
-    } else {
         digitalWrite(PIN_LED, HIGH);
+    } else {
+        digitalWrite(PIN_LED, LOW);
     }
 
     
     // If the calibrate button is pressed, then recalibrate the moisture threshold
     if(LOW == digitalRead(PIN_BUTTON)) {
         // Remember to debounce (if not debounced at the end of the loop)
-        handleSetMoistureThreshold(); 
+        handleSetMoistureThreshold();
     }
     
     // Sleep for one second
     //
     // This debounces the calibration button press and also is used to
-    //  give the moisture sensor a break
+    // give the moisture sensor a break
     delay(1000);
 }
 
@@ -215,29 +216,31 @@ void handleSetMoistureThreshold() {
  * 
  */
 void handleMoistureReading() {
-
+    
     if (-1 == state) {
         // There is no state; set the state to the current state
         state = moistureSensorValue < settings.moistureThreshold ? STATE_MOISTURE_DRY : STATE_MOISTURE_WET;;
         
-        // Publish the current state
-        publishCurrentState();
+        // Invoke a state change
+        onStateChange();
     }
 
     // If the previous state is DRY AND the moisture sensor value is above the threshold + allowance
     else if (state != STATE_MOISTURE_WET && moistureSensorValue > settings.moistureThreshold + SENSOR_ALLOWANCE) {
         // Change state to WET
         state = STATE_MOISTURE_WET;
-        // Publish the change of state
-        publishCurrentState();
+
+        // Invoke a state change
+        onStateChange();
     }
     
     // If the previous state is WET AND the moisture sensor value is below the threshold - allowance
     else if (state != STATE_MOISTURE_DRY && moistureSensorValue < settings.moistureThreshold - SENSOR_ALLOWANCE) {
         // Change state to dry
         state = STATE_MOISTURE_DRY;
-        // Publish the change of state
-        publishCurrentState();
+
+        // Invoke a state change
+        onStateChange();
     }
 
 }
@@ -268,6 +271,29 @@ void publishCurrentState() {
     }
 }
 
+/**
+ * Invoked on a state change (wet -> dry or dry -> wet or undefined -> some value).
+ * 
+ */
+void onStateChange() {
+    // Publish the current state
+    publishCurrentState();
+    
+    // Invoke the web hook
+    //
+    // The payload
+    char payload[128];
+    // Format the payload
+    sprintf(
+            payload,
+            "{\"moisture\": \"%d\", \"state\": \"%s\", \"threshold\": %d}",
+            moistureSensorValue,
+            STATE_MOISTURE_DRY == state ? VALUE_MOISTURE_DRY : VALUE_MOISTURE_WET,
+            settings.moistureThreshold
+        );
+    // Send the payload
+    Particle.publish(WEBHOOK_FIREBASE_POST, payload);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Setting functions
@@ -330,10 +356,10 @@ void unpersistSettings() {
 void readMoistureValue() {
     // Turn on the sensor
     digitalWrite(PIN_MOISTURE_SENSOR_POWER, HIGH);
-    
+
     // Give the sensor some time to turn on
     delay(10);
-    
+
     // Read the value and store in the sensorValue global
     moistureSensorValue = map(analogRead(A0), 0, 4095, 0, 100);
 
