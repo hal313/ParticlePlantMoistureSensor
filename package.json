@@ -1,0 +1,18 @@
+{
+  "name": "particle-plant-moisture-sensor",
+  "version": "0.9.1",
+  "description": "Plant moisture sensor - website and Particle code",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hal313/ParticlePlantMoistureSensor.git"
+  },
+  "author": "John Ghidiu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hal313/ParticlePlantMoistureSensor/issues"
+  },
+  "homepage": "https://github.com/hal313/ParticlePlantMoistureSensor#readme"
+}
