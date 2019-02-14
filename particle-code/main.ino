@@ -237,7 +237,7 @@ void handleMoistureReading() {
         state = moistureSensorValue < settings.moistureThreshold ? STATE_MOISTURE_DRY : STATE_MOISTURE_WET;;
         
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
 
     // If the previous state is DRY AND the moisture sensor value is above the threshold + allowance
@@ -246,7 +246,7 @@ void handleMoistureReading() {
         state = STATE_MOISTURE_WET;
 
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
     
     // If the previous state is WET AND the moisture sensor value is below the threshold - allowance
@@ -255,7 +255,7 @@ void handleMoistureReading() {
         state = STATE_MOISTURE_DRY;
 
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
 
     #ifdef FIREBASE_WEBHOOK_ENABLED
@@ -279,6 +279,11 @@ void publishThreshold() {
     char stringValue[40];
     sprintf(stringValue, "%d", settings.moistureThreshold);
     Particle.publish(NAME_MOISTURE_THRESHOLD, stringValue);
+
+    #ifdef FIREBASE_WEBHOOK_ENABLED
+    // Invoke the Firebase Webhook
+    invokeFirebaseWebhook();
+    #endif    
 }
 
 /**
@@ -291,21 +296,13 @@ void publishCurrentState() {
     } else if (STATE_MOISTURE_WET == state) {
         Particle.publish(NAME_MOISTURE_STATE, VALUE_MOISTURE_WET);
     }
-}
 
-/**
- * Invoked on a state change (wet -> dry or dry -> wet or undefined -> some value).
- * 
- */
-void onStateChange() {
-    // Publish the current state
-    publishCurrentState();
-    
     #ifdef FIREBASE_WEBHOOK_ENABLED
     // Invoke the Firebase Webhook
     invokeFirebaseWebhook();
     #endif
 }
+
 
 #ifdef FIREBASE_WEBHOOK_ENABLED
 /**
