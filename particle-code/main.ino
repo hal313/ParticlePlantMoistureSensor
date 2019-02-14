@@ -1,4 +1,21 @@
 ////////////////////////////////////////////////////////////////////////////////
+// Firebase Webhook Config
+////////////////////////////////////////////////////////////////////////////////
+//
+// The Firebase webhook
+#define FIREBASE_WEBHOOK_ENABLED true;
+//
+#ifdef FIREBASE_WEBHOOK_ENABLED
+// The interval (in milliseconds) to post to Firebase
+const int FIREBASE_WEBHOOK_INTERVAL_MILLISECONDS = 30000;
+// Last Firebase update timestamp
+long lastFirebaseUpdate = 0;
+// The webhook for posting data to Firebase
+const char *FIREBASE_POST_WEBHOOK = "firebase-post-data";
+#endif
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Pin Constants
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -19,7 +36,6 @@ const char *NAME_MOISTURE_THRESHOLD = "moisture_threshold";
 const char *NAME_MOISTURE_STATE = "state";
 const char *VALUE_MOISTURE_DRY = "DRY";
 const char *VALUE_MOISTURE_WET = "WET";
-const char *WEBHOOK_FIREBASE_POST = "firebase-post-data";
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -242,6 +258,13 @@ void handleMoistureReading() {
         onStateChange();
     }
 
+    #ifdef FIREBASE_WEBHOOK_ENABLED
+    // Update Firebase every 30 seconds
+    if (millis() - lastFirebaseUpdate > FIREBASE_WEBHOOK_INTERVAL_MILLISECONDS) {
+        invokeFirebaseWebhook();
+        lastFirebaseUpdate = millis();
+    }
+    #endif
 }
 
 
@@ -278,6 +301,18 @@ void onStateChange() {
     // Publish the current state
     publishCurrentState();
     
+    #ifdef FIREBASE_WEBHOOK_ENABLED
+    // Invoke the Firebase Webhook
+    invokeFirebaseWebhook();
+    #endif
+}
+
+#ifdef FIREBASE_WEBHOOK_ENABLED
+/**
+ * Invokes the Firebase Webhook.
+ * 
+ */
+void invokeFirebaseWebhook() {
     // Invoke the web hook
     //
     // The payload
@@ -291,8 +326,9 @@ void onStateChange() {
             settings.moistureThreshold
         );
     // Send the payload
-    Particle.publish(WEBHOOK_FIREBASE_POST, payload);
+    Particle.publish(FIREBASE_POST_WEBHOOK, payload);
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Setting functions
