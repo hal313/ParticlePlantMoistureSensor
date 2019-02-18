@@ -31,7 +31,8 @@ const int PIN_MOISTURE_SENSOR_POWER = D3;
 // String constants
 ////////////////////////////////////////////////////////////////////////////////
 //
-const char *NAME_MOISTURE_SENSOR_VALUE = "moisture";
+const char *NAME_MOISTURE_SENSOR_PERCENT = "moisture";
+const char *NAME_ACTUAL_MOISTURE_SENSOR_VALUE = "moisture_actual";
 const char *NAME_MOISTURE_THRESHOLD = "moisture_threshold";
 const char *NAME_MOISTURE_STATE = "state";
 const char *VALUE_MOISTURE_DRY = "DRY";
@@ -77,8 +78,10 @@ struct Settings {
 //
 // Get the initial state
 int state = -1; // Initial state (unset)
-// The moisture sensor value
-int moistureSensorValue;
+// The actual moisture sensor value
+int actualMoistureSensorValue;
+// The normalized moisture sensor value
+int normalizedMoistureSensorValue;
 // The settings
 Settings settings;
 
@@ -118,8 +121,10 @@ void setup() {
     
     // Bind variables for publishing
     //
-    // Configure the moisture sensor variable to be published
-    Particle.variable(NAME_MOISTURE_SENSOR_VALUE, &moistureSensorValue, INT);
+    // Configure the actual moisture reading variable to be published
+    Particle.variable(NAME_ACTUAL_MOISTURE_SENSOR_VALUE, &actualMoistureSensorValue, INT);
+    // Configure the moisture percent variable to be published
+    Particle.variable(NAME_MOISTURE_SENSOR_PERCENT, &normalizedMoistureSensorValue, INT);
     // Configure the moisture threshold variable to be published
     Particle.variable(NAME_MOISTURE_THRESHOLD, &settings.moistureThreshold, INT);
     // Configure the state variable to be published
@@ -210,7 +215,7 @@ void handleSetMoistureThreshold() {
     blinkLED(3, 250);
 
     // Set the current moisture value as the threshold
-    settings.moistureThreshold = moistureSensorValue;
+    settings.moistureThreshold = normalizedMoistureSensorValue;
 
     // Save the new threshold
     persistSettings();
@@ -234,28 +239,28 @@ void handleMoistureReading() {
     
     if (-1 == state) {
         // There is no state; set the state to the current state
-        state = moistureSensorValue < settings.moistureThreshold ? STATE_MOISTURE_DRY : STATE_MOISTURE_WET;;
+        state = normalizedMoistureSensorValue < settings.moistureThreshold ? STATE_MOISTURE_DRY : STATE_MOISTURE_WET;;
         
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
 
     // If the previous state is DRY AND the moisture sensor value is above the threshold + allowance
-    else if (state != STATE_MOISTURE_WET && moistureSensorValue > settings.moistureThreshold + SENSOR_ALLOWANCE) {
+    else if (state != STATE_MOISTURE_WET && normalizedMoistureSensorValue > settings.moistureThreshold + SENSOR_ALLOWANCE) {
         // Change state to WET
         state = STATE_MOISTURE_WET;
 
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
     
     // If the previous state is WET AND the moisture sensor value is below the threshold - allowance
-    else if (state != STATE_MOISTURE_DRY && moistureSensorValue < settings.moistureThreshold - SENSOR_ALLOWANCE) {
+    else if (state != STATE_MOISTURE_DRY && normalizedMoistureSensorValue < settings.moistureThreshold - SENSOR_ALLOWANCE) {
         // Change state to dry
         state = STATE_MOISTURE_DRY;
 
         // Invoke a state change
-        onStateChange();
+        publishCurrentState();
     }
 
     #ifdef FIREBASE_WEBHOOK_ENABLED
@@ -279,6 +284,11 @@ void publishThreshold() {
     char stringValue[40];
     sprintf(stringValue, "%d", settings.moistureThreshold);
     Particle.publish(NAME_MOISTURE_THRESHOLD, stringValue);
+
+    #ifdef FIREBASE_WEBHOOK_ENABLED
+    // Invoke the Firebase Webhook
+    invokeFirebaseWebhook();
+    #endif    
 }
 
 /**
@@ -291,21 +301,13 @@ void publishCurrentState() {
     } else if (STATE_MOISTURE_WET == state) {
         Particle.publish(NAME_MOISTURE_STATE, VALUE_MOISTURE_WET);
     }
-}
 
-/**
- * Invoked on a state change (wet -> dry or dry -> wet or undefined -> some value).
- * 
- */
-void onStateChange() {
-    // Publish the current state
-    publishCurrentState();
-    
     #ifdef FIREBASE_WEBHOOK_ENABLED
     // Invoke the Firebase Webhook
     invokeFirebaseWebhook();
     #endif
 }
+
 
 #ifdef FIREBASE_WEBHOOK_ENABLED
 /**
@@ -320,9 +322,14 @@ void invokeFirebaseWebhook() {
     // Format the payload
     sprintf(
             payload,
-            "{\"moisture\": \"%d\", \"state\": \"%s\", \"threshold\": %d}",
-            moistureSensorValue,
+            "{\"%s\": \"%d\", \"%s\": %d, \"%s\": \"%s\", \"%s\": %d}",
+            NAME_MOISTURE_SENSOR_PERCENT,
+            normalizedMoistureSensorValue,
+            NAME_ACTUAL_MOISTURE_SENSOR_VALUE,
+            actualMoistureSensorValue,
+            NAME_MOISTURE_STATE,
             STATE_MOISTURE_DRY == state ? VALUE_MOISTURE_DRY : VALUE_MOISTURE_WET,
+            NAME_MOISTURE_THRESHOLD,
             settings.moistureThreshold
         );
     // Send the payload
@@ -385,7 +392,11 @@ void unpersistSettings() {
 // Sensor functions
 //
 /**
- * Reads the moisture value. The value will be read into "moistureSensorValue".
+ * Reads the moisture value.
+ *
+ * The actual value (0-4095) will be stored in "actualMoistureSensorValue"
+ *
+ * The normalized value (0-100) will be stored in "normalizedMoistureSensorValue".
  * 
  */
 void readMoistureValue() {
@@ -395,8 +406,10 @@ void readMoistureValue() {
     // Give the sensor some time to turn on
     delay(10);
 
-    // Read the value and store in the sensorValue global
-    moistureSensorValue = map(analogRead(A0), 0, 4095, 0, 100);
+    // Read the value and store in the actualMoistureSensorValue global
+    actualMoistureSensorValue = analogRead(A0);
+    // Map and store the value
+    normalizedMoistureSensorValue = map(actualMoistureSensorValue, 0, 4095, 0, 100);
 
     // Turn off the sensor
     digitalWrite(PIN_MOISTURE_SENSOR_POWER, LOW);
